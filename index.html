@@ -10,10 +10,31 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- VK / OK Bridge SDK -->
     <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/index.umd.js"></script>
+    <!-- JS Confetti (Библиотека для праздничного салюта) -->
+    <script src="https://cdn.jsdelivr.net/npm/js-confetti@latest/dist/js-confetti.browser.js"></script>
+    <style>
+        /* Анимация дрожания коробки перед открытием */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+        .animate-shake {
+            animation: shake 0.5s infinite;
+        }
+    </style>
 </head>
 <body class="bg-gradient-to-br from-orange-100 to-pink-100 min-h-screen font-sans text-gray-800 p-4">
 
-    <div class="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden p-6 mt-4">
+    <div class="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden p-6 mt-4 relative">
         <!-- Шапка с профилем пользователя -->
         <div class="flex items-center space-x-3 mb-4 p-2 bg-orange-50 rounded-xl border border-orange-100">
             <img id="user-avatar" src="https://via.placeholder.com/50" class="w-12 h-12 rounded-full border-2 border-orange-400">
@@ -85,15 +106,36 @@
         <div id="status-message" class="mt-4 text-center text-sm font-medium"></div>
     </div>
 
+    <!-- Модальное окно красивой распаковки подарка -->
+    <div id="gift-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-3xl p-6 text-center max-w-sm w-full shadow-2xl transform transition-all duration-300 scale-95" id="modal-box">
+            <div id="modal-gift-icon" class="text-7xl mb-4 transition-transform duration-500 cursor-pointer">
+                🎁
+            </div>
+            <h3 id="modal-title" class="text-xl font-bold text-gray-800">Тайный подарок!</h3>
+            <p id="modal-subtitle" class="text-xs text-gray-500 mt-1">Нажмите на коробку, чтобы открыть</p>
+            
+            <div id="modal-message-box" class="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-2xl hidden text-left">
+                <p class="text-xs text-orange-500 font-bold uppercase tracking-wider mb-1">Сообщение внутри:</p>
+                <p id="modal-message-text" class="text-sm font-medium text-gray-800 italic"></p>
+            </div>
+
+            <button onclick="closeModal()" id="modal-close-btn" class="mt-6 w-full bg-gray-200 text-gray-700 py-2.5 rounded-xl font-bold hover:bg-gray-300 transition">
+                Закрыть
+            </button>
+        </div>
+    </div>
+
     <!-- СКРИПТЫ -->
     <script>
-        // Ваши реальные данные Supabase
         const SUPABASE_URL = 'https://shaxorczbegnjoiwsfsl.supabase.co'; 
         const SUPABASE_ANON_KEY = 'sb_publishable_pfVnjJtHSXGUrPyD13-Mhg_eeb7dM7a';
 
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const jsConfetti = new JSConfetti();
 
-        let currentUserId = 12345678; // Фолбэк для теста
+        let currentUserId = 12345678; 
+        let activeGiftToOpen = null;
 
         async function initApp() {
             try {
@@ -165,6 +207,7 @@
             } else {
                 statusEl.innerHTML = '<span class="text-green-600">Подарок успешно отправлен! 🎉</span>';
                 document.getElementById('gift-message').value = '';
+                jsConfetti.addConfetti({ emojis: ['🎁', '✨', '🎉'] });
             }
         }
 
@@ -189,18 +232,80 @@
                             <p class="font-bold text-gray-800">${gift.gift_type}</p>
                             <p class="text-gray-500">${gift.is_opened ? '💬 ' + gift.message : '🔒 Тайное сообщение (скрыто)'}</p>
                         </div>
-                        <button onclick="openGift(${gift.id}, ${gift.is_opened})" class="px-3 py-1.5 bg-orange-500 text-white rounded-lg font-bold shadow">
-                            ${gift.is_opened ? 'Открыт' : 'Открыть'}
+                        <button onclick="startUnpackAnimation(${gift.id}, '${gift.gift_type}', '${gift.message.replace(/'/g, "\\'")}', ${gift.is_opened})" 
+                                class="px-3 py-1.5 ${gift.is_opened ? 'bg-gray-300 text-gray-700' : 'bg-gradient-to-r from-orange-500 to-pink-500 text-white'} rounded-lg font-bold shadow">
+                            ${gift.is_opened ? 'Просмотр' : 'Открыть 🎁'}
                         </button>
                     </div>
                 `;
             });
         }
 
-        async function openGift(giftId, isOpened) {
-            if (isOpened) return;
-            await supabaseClient.from('gifts').update({ is_opened: true }).eq('id', giftId);
-            loadReceivedGifts();
+        // Запуск анимации модального окна
+        function startUnpackAnimation(id, type, message, isOpened) {
+            activeGiftToOpen = { id, type, message, isOpened };
+            
+            const modal = document.getElementById('gift-modal');
+            const icon = document.getElementById('modal-gift-icon');
+            const title = document.getElementById('modal-title');
+            const subtitle = document.getElementById('modal-subtitle');
+            const msgBox = document.getElementById('modal-message-box');
+            const msgText = document.getElementById('modal-message-text');
+
+            modal.classList.remove('hidden');
+
+            if (isOpened) {
+                // Если подарок уже открыт ранее
+                icon.innerText = '🎉';
+                icon.className = 'text-7xl mb-4';
+                title.innerText = type;
+                subtitle.innerText = 'Этот подарок уже был открыт';
+                msgText.innerText = message;
+                msgBox.classList.remove('hidden');
+            } else {
+                // Если подарок еще запечатан
+                icon.innerText = '📦';
+                icon.className = 'text-7xl mb-4 animate-shake cursor-pointer';
+                title.innerText = 'Вам пришел подарок!';
+                subtitle.innerText = 'Нажмите на коробку, чтобы открыть!';
+                msgBox.classList.add('hidden');
+                
+                icon.onclick = unpackGiftNow;
+            }
+        }
+
+        async function unpackGiftNow() {
+            const icon = document.getElementById('modal-gift-icon');
+            const title = document.getElementById('modal-title');
+            const subtitle = document.getElementById('modal-subtitle');
+            const msgBox = document.getElementById('modal-message-box');
+            const msgText = document.getElementById('modal-message-text');
+
+            icon.onclick = null; // Отключаем повторный клик
+            icon.className = 'text-7xl mb-4 transition-transform duration-500 scale-125';
+
+            // Эффект взрыва конфетти
+            jsConfetti.addConfetti({
+                emojis: ['🎉', '💖', '🎁', '⭐', '🎈'],
+                confettiNumber: 80,
+            });
+
+            // Менявм иконку на открытый подарок
+            setTimeout(async () => {
+                icon.innerText = '🎉';
+                title.innerText = activeGiftToOpen.type;
+                subtitle.innerText = 'Сюрприз успешно развернут!';
+                msgText.innerText = activeGiftToOpen.message;
+                msgBox.classList.remove('hidden');
+
+                // Обновляем статус в базе Supabase
+                await supabaseClient.from('gifts').update({ is_opened: true }).eq('id', activeGiftToOpen.id);
+                loadReceivedGifts();
+            }, 400);
+        }
+
+        function closeModal() {
+            document.getElementById('gift-modal').classList.add('hidden');
         }
 
         function switchTab(tab) {
