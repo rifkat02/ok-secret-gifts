@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тайные Подарки - Одноклассники</title>
+    <!-- Подключаем Tailwind CSS для стиля -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Подключаем клиент Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gradient-to-br from-orange-100 to-pink-100 min-h-screen font-sans text-gray-800 p-4">
+
+    <div class="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden p-6 mt-4">
+        <div class="text-center">
+            <h1 class="text-2xl font-bold text-orange-600">🎁 Тайные Подарки</h1>
+            <p class="text-sm text-gray-500 mt-1">Сделай сюрприз другу в Одноклассниках!</p>
+        </div>
+
+        <!-- Блок профиля / Баланса -->
+        <div class="mt-6 bg-orange-50 p-4 rounded-xl flex justify-between items-center border border-orange-200">
+            <div>
+                <p class="text-xs text-gray-500">Ваш баланс:</p>
+                <p class="text-xl font-extrabold text-orange-600" id="user-coins">100 🪙 Оков</p>
+            </div>
+            <button onclick="addBonusCoins()" class="bg-orange-500 hover:bg-orange-600 text-white text-xs px-3 py-2 rounded-lg font-semibold transition">
+                + Награда
+            </button>
+        </div>
+
+        <!-- Форма отправки подарка -->
+        <div class="mt-6 space-y-4">
+            <h2 class="font-bold text-lg text-gray-700">Отправить тайный сюрприз</h2>
+            
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">ID друга в Одноклассниках:</label>
+                <input type="number" id="receiver-id" placeholder="Например: 58493021" class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm">
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Тип подарка:</label>
+                <select id="gift-type" class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white">
+                    <option value="📦 Коробка-сюрприз (Тайная)">📦 Коробка-сюрприз (Тайная)</option>
+                    <option value="💖 Сердце с интригой">💖 Сердце с интригой</option>
+                    <option value="🚀 Звездный подарок">🚀 Звездный подарок</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Секретное сообщение:</label>
+                <textarea id="gift-message" placeholder="Угадай, от кого? ;)" rows="2" class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm"></textarea>
+            </div>
+
+            <button onclick="sendGift()" class="w-full bg-gradient-to-r from-orange-500 to-pink-500 text-white py-3 rounded-xl font-bold shadow-md hover:opacity-90 transition">
+                Отправить подарок 🎁
+            </button>
+        </div>
+
+        <!-- Статус -->
+        <div id="status-message" class="mt-4 text-center text-sm font-medium"></div>
+    </div>
+
+    <!-- СКРИПТ ПОДКЛЮЧЕНИЯ К SUPABASE -->
+    <script>
+        // Ваш URL и публичный ключ Supabase
+        const SUPABASE_URL = 'https://rifkat02.supabase.co'; 
+        const SUPABASE_ANON_KEY = 'sb_publishable_pfVnjJtHSXGUrPyD13-Mhg_eeb7dM7a';
+
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Демо-пользователь для тестирования
+        const currentUserId = 12345678; 
+
+        // Проверяем / создаем пользователя при входе
+        async function initUser() {
+            let { data, error } = await supabaseClient
+                .from('ok_users')
+                .select('*')
+                .eq('id', currentUserId)
+                .maybeSingle();
+
+            if (!data) {
+                // Если пользователя нет в базе — создаем тестовую запись
+                await supabaseClient.from('ok_users').insert([
+                    { id: currentUserId, first_name: 'Игрок', last_name: 'ОК', coins: 100 }
+                ]);
+            } else {
+                document.getElementById('user-coins').innerText = data.coins + ' 🪙 Оков';
+            }
+        }
+
+        async function sendGift() {
+            const receiverId = document.getElementById('receiver-id').value;
+            const giftType = document.getElementById('gift-type').value;
+            const message = document.getElementById('gift-message').value;
+            const statusEl = document.getElementById('status-message');
+
+            if (!receiverId) {
+                statusEl.innerHTML = '<span class="text-red-500">Введите ID друга!</span>';
+                return;
+            }
+
+            // Отправляем подарок в базу данных Supabase
+            const { error } = await supabaseClient.from('gifts').insert([
+                { sender_id: currentUserId, receiver_id: parseInt(receiverId), gift_type: giftType, message: message, is_secret: true }
+            ]);
+
+            if (error) {
+                statusEl.innerHTML = '<span class="text-red-500">Ошибка отправки: ' + error.message + '</span>';
+            } else {
+                statusEl.innerHTML = '<span class="text-green-600">Подарок успешно отправлен тайным агентом! 🎉</span>';
+                document.getElementById('receiver-id').value = '';
+                document.getElementById('gift-message').value = '';
+            }
+        }
+
+        async function addBonusCoins() {
+            // Начисление бонуса
+            const { data } = await supabaseClient.from('ok_users').select('coins').eq('id', currentUserId).maybeSingle();
+            if(data) {
+                const newCoins = data.coins + 50;
+                await supabaseClient.from('ok_users').update({ coins: newCoins }).eq('id', currentUserId);
+                document.getElementById('user-coins').innerText = newCoins + ' 🪙 Оков';
+            }
+        }
+
+        // Автоматический запуск при загрузке страницы
+        initUser();
+    </script>
+</body>
+</html>
