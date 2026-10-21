@@ -2,346 +2,38 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Тайные Подарки</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Supabase JS -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- VK / OK Bridge SDK -->
+    <!-- VK Bridge подключаем синхронно самым первым -->
     <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/index.umd.js"></script>
-    <!-- JS Confetti -->
-    <script src="https://cdn.jsdelivr.net/npm/js-confetti@latest/dist/js-confetti.browser.js"></script>
     <style>
-        @keyframes shake {
-            0% { transform: translate(1px, 1px) rotate(0deg); }
-            10% { transform: translate(-1px, -2px) rotate(-1deg); }
-            20% { transform: translate(-3px, 0px) rotate(1deg); }
-            30% { transform: translate(3px, 2px) rotate(0deg); }
-            40% { transform: translate(1px, -1px) rotate(1deg); }
-            50% { transform: translate(-1px, 2px) rotate(-1deg); }
-            60% { transform: translate(-3px, 1px) rotate(0deg); }
-            70% { transform: translate(3px, 1px) rotate(-1deg); }
-            80% { transform: translate(-1px, -1px) rotate(1deg); }
-            90% { transform: translate(1px, 2px) rotate(0deg); }
-            100% { transform: translate(1px, -2px) rotate(-1deg); }
-        }
-        .animate-shake { animation: shake 0.5s infinite; }
+        body { font-family: sans-serif; text-align: center; background: #fff5f0; padding: 20px; margin: 0; }
+        .card { background: white; border-radius: 16px; padding: 20px; max-width: 360px; margin: 20px auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1 { color: #ff5722; font-size: 20px; margin-bottom: 10px; }
+        button { background: #ff5722; color: white; border: none; padding: 12px 20px; border-radius: 10px; font-weight: bold; font-size: 14px; width: 100%; cursor: pointer; }
     </style>
 </head>
-<body class="bg-gradient-to-br from-orange-100 to-pink-100 min-h-screen font-sans text-gray-800 p-4">
+<body>
 
-    <div class="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden p-6 mt-4 relative">
-        <!-- Шапка с профилем пользователя -->
-        <div class="flex items-center space-x-3 mb-4 p-2 bg-orange-50 rounded-xl border border-orange-100">
-            <img id="user-avatar" src="https://via.placeholder.com/50" class="w-12 h-12 rounded-full border-2 border-orange-400">
-            <div>
-                <h3 id="user-name" class="font-bold text-gray-800 text-sm">Игрок</h3>
-                <p class="text-xs text-gray-500">Ваш ID: <span id="user-id">---</span></p>
-            </div>
-        </div>
-
-        <div class="text-center">
-            <h1 class="text-2xl font-bold text-orange-600">🎁 Тайные Подарки</h1>
-            <p class="text-sm text-gray-500 mt-1">Сделай сюрприз другу!</p>
-        </div>
-
-        <!-- Баланс -->
-        <div class="mt-4 bg-gradient-to-r from-orange-500 to-pink-500 p-4 rounded-xl text-white flex justify-between items-center shadow">
-            <div>
-                <p class="text-xs opacity-80">Ваш баланс:</p>
-                <p class="text-xl font-extrabold" id="user-coins">100 🪙 Оков</p>
-            </div>
-            <button onclick="addBonusCoins()" class="bg-white text-orange-600 text-xs px-3 py-2 rounded-lg font-bold shadow hover:bg-orange-50 transition">
-                + Бонус
-            </button>
-        </div>
-
-        <!-- Переключение вкладок -->
-        <div class="flex mt-6 bg-gray-100 p-1 rounded-xl text-sm font-semibold">
-            <button onclick="switchTab('send')" id="btn-tab-send" class="flex-1 py-2 rounded-lg bg-white shadow text-orange-600 transition">Отправить</button>
-            <button onclick="switchTab('received')" id="btn-tab-received" class="flex-1 py-2 rounded-lg text-gray-500 transition">Входящие 📦</button>
-        </div>
-
-        <!-- Вкладка: Отправить подарок -->
-        <div id="tab-send" class="mt-4 space-y-4">
-            <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Выберите друга:</label>
-                <select id="friends-select" class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white">
-                    <option value="">Нажмите чтобы выбрать друга...</option>
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Тип подарка:</label>
-                <select id="gift-type" class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white">
-                    <option value="📦 Коробка-сюрприз (Тайная)">📦 Коробка-сюрприз (Тайная)</option>
-                    <option value="💖 Сердце с интригой">💖 Сердце с интригой</option>
-                    <option value="🚀 Звездный подарок">🚀 Звездный подарок</option>
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Секретное сообщение:</label>
-                <textarea id="gift-message" placeholder="Угадай, от кого? ;)" rows="2" class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm"></textarea>
-            </div>
-
-            <button onclick="sendGift()" class="w-full bg-gradient-to-r from-orange-500 to-pink-500 text-white py-3 rounded-xl font-bold shadow-md hover:opacity-90 transition">
-                Отправить подарок 🎁
-            </button>
-        </div>
-
-        <!-- Вкладка: Полученные подарки -->
-        <div id="tab-received" class="mt-4 space-y-3 hidden">
-            <h2 class="font-bold text-sm text-gray-700">Подарки для вас:</h2>
-            <div id="received-gifts-list" class="space-y-2 max-h-60 overflow-y-auto">
-                <p class="text-xs text-gray-400 text-center py-4">Загрузка подарков...</p>
-            </div>
-        </div>
-
-        <!-- Статус -->
-        <div id="status-message" class="mt-4 text-center text-sm font-medium"></div>
+    <div class="card">
+        <h1>🎁 Тайные Подарки</h1>
+        <p id="status">Загрузка игры...</p>
+        <button onclick="alert('Игра работает!')">Начать 🚀</button>
     </div>
 
-    <!-- Модальное окно распаковки -->
-    <div id="gift-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50">
-        <div class="bg-white rounded-3xl p-6 text-center max-w-sm w-full shadow-2xl transform transition-all duration-300 scale-95" id="modal-box">
-            <div id="modal-gift-icon" class="text-7xl mb-4 transition-transform duration-500 cursor-pointer">📦</div>
-            <h3 id="modal-title" class="text-xl font-bold text-gray-800">Тайный подарок!</h3>
-            <p id="modal-subtitle" class="text-xs text-gray-500 mt-1">Нажмите на коробку, чтобы открыть</p>
-            
-            <div id="modal-message-box" class="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-2xl hidden text-left">
-                <p class="text-xs text-orange-500 font-bold uppercase tracking-wider mb-1">Сообщение внутри:</p>
-                <p id="modal-message-text" class="text-sm font-medium text-gray-800 italic"></p>
-            </div>
-
-            <button onclick="closeModal()" id="modal-close-btn" class="mt-6 w-full bg-gray-200 text-gray-700 py-2.5 rounded-xl font-bold hover:bg-gray-300 transition">
-                Закрыть
-            </button>
-        </div>
-    </div>
-
-    <!-- СКРИПТЫ -->
     <script>
-        const SUPABASE_URL = 'https://shaxorczbegnjoiwsfsl.supabase.co'; 
-        const SUPABASE_ANON_KEY = 'sb_publishable_pfVnjJtHSXGUrPyD13-Mhg_eeb7dM7a';
-
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        const jsConfetti = new JSConfetti();
-
-        let currentUserId = 12345678; 
-        let activeGiftToOpen = null;
-
-        // МГНОВЕННАЯ ИНИЦИАЛИЗАЦИЯ ДЛЯ VK / OK CONTAINER
-        if (window.vkBridge) {
-            vkBridge.send('VKWebAppInit');
-        }
-
-        async function initApp() {
-            // Получаем пользователя из контейнера VK/OK
-            try {
-                if (window.vkBridge) {
-                    const user = await vkBridge.send('VKWebAppGetUserInfo');
-                    if (user && user.id) {
-                        currentUserId = user.id;
-                        document.getElementById('user-name').innerText = (user.first_name || 'Игрок') + ' ' + (user.last_name || '');
-                        document.getElementById('user-id').innerText = user.id;
-                        if (user.photo_100) document.getElementById('user-avatar').src = user.photo_100;
-                    }
-                }
-            } catch (e) {
-                console.log('Запуск вне VK контейнера или ошибка:', e);
-                document.getElementById('user-id').innerText = currentUserId;
+        // Немедленно отправляем сигналы в VK, что мы загрузились
+        try {
+            if (window.vkBridge) {
+                vkBridge.send('VKWebAppInit');
             }
-
-            // Загружаем базы и друзей асинхронно
-            initUserInDb();
-            loadFriends();
-            loadReceivedGifts();
+        } catch(e) {
+            console.log('Bridge error:', e);
         }
 
-        async function initUserInDb() {
-            try {
-                let { data } = await supabaseClient.from('ok_users').select('*').eq('id', currentUserId).maybeSingle();
-                if (!data) {
-                    await supabaseClient.from('ok_users').insert([{ id: currentUserId, first_name: 'Игрок', last_name: 'ОК', coins: 100 }]);
-                } else {
-                    document.getElementById('user-coins').innerText = data.coins + ' 🪙 Оков';
-                }
-            } catch(e) { console.error(e); }
-        }
-
-        async function loadFriends() {
-            const selectEl = document.getElementById('friends-select');
-            try {
-                if (window.vkBridge) {
-                    const friendsData = await vkBridge.send('VKWebAppGetFriends');
-                    if (friendsData && friendsData.users && friendsData.users.length > 0) {
-                        selectEl.innerHTML = '<option value="">-- Выберите друга --</option>';
-                        friendsData.users.forEach(f => {
-                            selectEl.innerHTML += `<option value="${f.id}">${f.first_name} ${f.last_name}</option>`;
-                        });
-                        return;
-                    }
-                }
-            } catch (e) { console.log('Не удалось загрузить реальных друзей'); }
-
-            // Фолбэк список
-            selectEl.innerHTML = `
-                <option value="">-- Выберите друга (Демо) --</option>
-                <option value="87654321">Иван Иванов</option>
-                <option value="98765432">Елена Петрова</option>
-            `;
-        }
-
-        async function sendGift() {
-            const receiverId = document.getElementById('friends-select').value;
-            const giftType = document.getElementById('gift-type').value;
-            const message = document.getElementById('gift-message').value;
-            const statusEl = document.getElementById('status-message');
-
-            if (!receiverId) {
-                statusEl.innerHTML = '<span class="text-red-500">Выберите друга!</span>';
-                return;
-            }
-
-            const { error } = await supabaseClient.from('gifts').insert([
-                { sender_id: currentUserId, receiver_id: parseInt(receiverId), gift_type: giftType, message: message, is_secret: true, is_opened: false }
-            ]);
-
-            if (error) {
-                statusEl.innerHTML = '<span class="text-red-500">Ошибка: ' + error.message + '</span>';
-            } else {
-                statusEl.innerHTML = '<span class="text-green-600">Подарок успешно отправлен! 🎉</span>';
-                document.getElementById('gift-message').value = '';
-                jsConfetti.addConfetti({ emojis: ['🎁', '✨', '🎉'] });
-            }
-        }
-
-        async function loadReceivedGifts() {
-            const listEl = document.getElementById('received-gifts-list');
-            const { data, error } = await supabaseClient
-                .from('gifts')
-                .select('*')
-                .eq('receiver_id', currentUserId)
-                .order('created_at', { ascending: false });
-
-            if (error || !data || data.length === 0) {
-                listEl.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">Пока нет входящих подарков</p>';
-                return;
-            }
-
-            listEl.innerHTML = '';
-            data.forEach(gift => {
-                listEl.innerHTML += `
-                    <div class="p-3 bg-orange-50 rounded-xl border border-orange-200 flex justify-between items-center text-xs">
-                        <div>
-                            <p class="font-bold text-gray-800">${gift.gift_type}</p>
-                            <p class="text-gray-500">${gift.is_opened ? '💬 ' + gift.message : '🔒 Тайное сообщение (скрыто)'}</p>
-                        </div>
-                        <button onclick="startUnpackAnimation(${gift.id}, '${gift.gift_type}', '${(gift.message || '').replace(/'/g, "\\'")}', ${gift.is_opened})" 
-                                class="px-3 py-1.5 ${gift.is_opened ? 'bg-gray-300 text-gray-700' : 'bg-gradient-to-r from-orange-500 to-pink-500 text-white'} rounded-lg font-bold shadow">
-                            ${gift.is_opened ? 'Просмотр' : 'Открыть 🎁'}
-                        </button>
-                    </div>
-                `;
-            });
-        }
-
-        function startUnpackAnimation(id, type, message, isOpened) {
-            activeGiftToOpen = { id, type, message, isOpened };
-            
-            const modal = document.getElementById('gift-modal');
-            const icon = document.getElementById('modal-gift-icon');
-            const title = document.getElementById('modal-title');
-            const subtitle = document.getElementById('modal-subtitle');
-            const msgBox = document.getElementById('modal-message-box');
-            const msgText = document.getElementById('modal-message-text');
-
-            modal.classList.remove('hidden');
-
-            if (isOpened) {
-                icon.innerText = '🎉';
-                icon.className = 'text-7xl mb-4';
-                title.innerText = type;
-                subtitle.innerText = 'Этот подарок уже был открыт';
-                msgText.innerText = message;
-                msgBox.classList.remove('hidden');
-            } else {
-                icon.innerText = '📦';
-                icon.className = 'text-7xl mb-4 animate-shake cursor-pointer';
-                title.innerText = 'Вам пришел подарок!';
-                subtitle.innerText = 'Нажмите на коробку, чтобы открыть!';
-                msgBox.classList.add('hidden');
-                
-                icon.onclick = unpackGiftNow;
-            }
-        }
-
-        async function unpackGiftNow() {
-            const icon = document.getElementById('modal-gift-icon');
-            const title = document.getElementById('modal-title');
-            const subtitle = document.getElementById('modal-subtitle');
-            const msgBox = document.getElementById('modal-message-box');
-            const msgText = document.getElementById('modal-message-text');
-
-            icon.onclick = null;
-            icon.className = 'text-7xl mb-4 transition-transform duration-500 scale-125';
-
-            jsConfetti.addConfetti({
-                emojis: ['🎉', '💖', '🎁', '⭐', '🎈'],
-                confettiNumber: 80,
-            });
-
-            setTimeout(async () => {
-                icon.innerText = '🎉';
-                title.innerText = activeGiftToOpen.type;
-                subtitle.innerText = 'Сюрприз успешно развернут!';
-                msgText.innerText = activeGiftToOpen.message;
-                msgBox.classList.remove('hidden');
-
-                await supabaseClient.from('gifts').update({ is_opened: true }).eq('id', activeGiftToOpen.id);
-                loadReceivedGifts();
-            }, 400);
-        }
-
-        function closeModal() {
-            document.getElementById('gift-modal').classList.add('hidden');
-        }
-
-        function switchTab(tab) {
-            const sendTab = document.getElementById('tab-send');
-            const recvTab = document.getElementById('tab-received');
-            const btnSend = document.getElementById('btn-tab-send');
-            const btnRecv = document.getElementById('btn-tab-received');
-
-            if (tab === 'send') {
-                sendTab.classList.remove('hidden');
-                recvTab.classList.add('hidden');
-                btnSend.className = "flex-1 py-2 rounded-lg bg-white shadow text-orange-600 transition";
-                btnRecv.className = "flex-1 py-2 rounded-lg text-gray-500 transition";
-            } else {
-                sendTab.classList.add('hidden');
-                recvTab.classList.remove('hidden');
-                btnRecv.className = "flex-1 py-2 rounded-lg bg-white shadow text-orange-600 transition";
-                btnSend.className = "flex-1 py-2 rounded-lg text-gray-500 transition";
-                loadReceivedGifts();
-            }
-        }
-
-        async function addBonusCoins() {
-            try {
-                const { data } = await supabaseClient.from('ok_users').select('coins').eq('id', currentUserId).maybeSingle();
-                if(data) {
-                    const newCoins = data.coins + 50;
-                    await supabaseClient.from('ok_users').update({ coins: newCoins }).eq('id', currentUserId);
-                    document.getElementById('user-coins').innerText = newCoins + ' 🪙 Оков';
-                }
-            } catch(e) { console.error(e); }
-        }
-
-        // Запуск
-        initApp();
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('status').innerText = 'Игра успешно запущена в VK!';
+        });
     </script>
 </body>
 </html>
