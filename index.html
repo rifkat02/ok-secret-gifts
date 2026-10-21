@@ -4,13 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Тайные Подарки</title>
-    <!-- VK Bridge подключаем синхронно самым первым -->
+    <!-- VK Bridge загружаем первой строкой -->
     <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/index.umd.js"></script>
+    <script>
+        // Мгновенно отправляем сигнал ВК до загрузки остальных ресурсов
+        (function() {
+            try {
+                if (window.vkBridge) {
+                    vkBridge.send('VKWebAppInit');
+                }
+            } catch(e) {}
+        })();
+    </script>
     <style>
         body { font-family: sans-serif; text-align: center; background: #fff5f0; padding: 20px; margin: 0; }
         .card { background: white; border-radius: 16px; padding: 20px; max-width: 360px; margin: 20px auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         h1 { color: #ff5722; font-size: 20px; margin-bottom: 10px; }
-        button { background: #ff5722; color: white; border: none; padding: 12px 20px; border-radius: 10px; font-weight: bold; font-size: 14px; width: 100%; cursor: pointer; }
+        button { background: #ff5722; color: white; border: none; padding: 12px 20px; border-radius: 10px; font-weight: bold; font-size: 14px; width: 100%; cursor: pointer; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -18,21 +28,25 @@
     <div class="card">
         <h1>🎁 Тайные Подарки</h1>
         <p id="status">Загрузка игры...</p>
-        <button onclick="alert('Игра работает!')">Начать 🚀</button>
+        <div id="user-box" style="font-size: 14px; color: #555; margin: 10px 0;"></div>
+        <button onclick="alert('Всё работает!')">Начать игру 🚀</button>
     </div>
 
     <script>
-        // Немедленно отправляем сигналы в VK, что мы загрузились
-        try {
-            if (window.vkBridge) {
-                vkBridge.send('VKWebAppInit');
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                if (window.vkBridge) {
+                    const userInfo = await vkBridge.send('VKWebAppGetUserInfo');
+                    if (userInfo && userInfo.first_name) {
+                        document.getElementById('user-box').innerText = 'Привет, ' + userInfo.first_name + '!';
+                    }
+                    document.getElementById('status').innerText = 'Игра успешно запущена в VK!';
+                } else {
+                    document.getElementById('status').innerText = 'Режим браузера';
+                }
+            } catch(e) {
+                document.getElementById('status').innerText = 'Игра готова к работе!';
             }
-        } catch(e) {
-            console.log('Bridge error:', e);
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('status').innerText = 'Игра успешно запущена в VK!';
         });
     </script>
 </body>
