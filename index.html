@@ -2,9 +2,9 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Тайные Подарки</title>
-    <!-- Подключаем Supabase -->
+    <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- VK Bridge -->
     <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/index.umd.js"></script>
@@ -72,12 +72,10 @@
     </div>
 
     <script>
-        // Инициализация моста VK/OK без ожидания тяжелых библиотек
-        try {
-            if (window.vkBridge) {
-                window.vkBridge.send('VKWebAppInit');
-            }
-        } catch(e) {}
+        // Жёсткая инициализация VK Bridge для снятия прелоадера
+        if (typeof vkBridge !== 'undefined') {
+            vkBridge.send('VKWebAppInit').catch(() => {});
+        }
 
         const SUPABASE_URL = 'https://shaxorczbegnjoiwsfsl.supabase.co'; 
         const SUPABASE_ANON_KEY = 'sb_publishable_pfVnjJtHSXGUrPyD13-Mhg_eeb7dM7a';
@@ -87,8 +85,8 @@
 
         async function start() {
             try {
-                if (window.vkBridge) {
-                    const user = await window.vkBridge.send('VKWebAppGetUserInfo');
+                if (typeof vkBridge !== 'undefined') {
+                    const user = await vkBridge.send('VKWebAppGetUserInfo');
                     if (user && user.id) {
                         currentUserId = user.id;
                         document.getElementById('user-info').innerText = 'Игрок: ' + user.first_name + ' (ID: ' + user.id + ')';
