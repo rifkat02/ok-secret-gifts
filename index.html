@@ -4,27 +4,38 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Тайные Подарки - Одноклассники</title>
-    <!-- Подключаем Tailwind CSS для стиля -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Подключаем клиент Supabase -->
+    <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- VK / OK Bridge SDK для работы внутри соцсети -->
+    <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/index.umd.js"></script>
 </head>
 <body class="bg-gradient-to-br from-orange-100 to-pink-100 min-h-screen font-sans text-gray-800 p-4">
 
     <div class="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden p-6 mt-4">
-        <div class="text-center">
-            <h1 class="text-2xl font-bold text-orange-600">🎁 Тайные Подарки</h1>
-            <p class="text-sm text-gray-500 mt-1">Сделай сюрприз другу в Одноклассниках!</p>
+        <!-- Шапка с профилем пользователя -->
+        <div class="flex items-center space-x-3 mb-4 p-2 bg-orange-50 rounded-xl border border-orange-100">
+            <img id="user-avatar" src="https://via.placeholder.com/50" class="w-12 h-12 rounded-full border-2 border-orange-400">
+            <div>
+                <h3 id="user-name" class="font-bold text-gray-800 text-sm">Загрузка профиля...</h3>
+                <p class="text-xs text-gray-500">Ваш ID: <span id="user-id">---</span></p>
+            </div>
         </div>
 
-        <!-- Блок профиля / Баланса -->
-        <div class="mt-6 bg-orange-50 p-4 rounded-xl flex justify-between items-center border border-orange-200">
+        <div class="text-center">
+            <h1 class="text-2xl font-bold text-orange-600">🎁 Тайные Подарки</h1>
+            <p class="text-sm text-gray-500 mt-1">Сделай сюрприз другу!</p>
+        </div>
+
+        <!-- Баланс -->
+        <div class="mt-4 bg-gradient-to-r from-orange-500 to-pink-500 p-4 rounded-xl text-white flex justify-between items-center shadow">
             <div>
-                <p class="text-xs text-gray-500">Ваш баланс:</p>
-                <p class="text-xl font-extrabold text-orange-600" id="user-coins">100 🪙 Оков</p>
+                <p class="text-xs opacity-80">Ваш баланс:</p>
+                <p class="text-xl font-extrabold" id="user-coins">100 🪙 Оков</p>
             </div>
-            <button onclick="addBonusCoins()" class="bg-orange-500 hover:bg-orange-600 text-white text-xs px-3 py-2 rounded-lg font-semibold transition">
-                + Награда
+            <button onclick="addBonusCoins()" class="bg-white text-orange-600 text-xs px-3 py-2 rounded-lg font-bold shadow hover:bg-orange-50 transition">
+                + Бонус
             </button>
         </div>
 
@@ -32,9 +43,12 @@
         <div class="mt-6 space-y-4">
             <h2 class="font-bold text-lg text-gray-700">Отправить тайный сюрприз</h2>
             
+            <!-- Выбор друга из выпадающего списка -->
             <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">ID друга в Одноклассниках:</label>
-                <input type="number" id="receiver-id" placeholder="Например: 58493021" class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Выберите друга:</label>
+                <select id="friends-select" class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white">
+                    <option value="">Загрузка списка друзей...</option>
+                </select>
             </div>
 
             <div>
@@ -60,27 +74,52 @@
         <div id="status-message" class="mt-4 text-center text-sm font-medium"></div>
     </div>
 
-    <!-- СКРИПТ ПОДКЛЮЧЕНИЯ К SUPABASE -->
+    <!-- СКРИПТ ПОДКЛЮЧЕНИЯ К SUPABASE И VK/OK BRIDGE -->
     <script>
-        // Ваш URL и публичный ключ Supabase
         const SUPABASE_URL = 'https://rifkat02.supabase.co'; 
         const SUPABASE_ANON_KEY = 'sb_publishable_pfVnjJtHSXGUrPyD13-Mhg_eeb7dM7a';
 
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // Демо-пользователь для тестирования
-        const currentUserId = 12345678; 
+        let currentUserId = 12345678; // Фолбэк ID для тестов вне соцсети
 
-        // Проверяем / создаем пользователя при входе
-        async function initUser() {
-            let { data, error } = await supabaseClient
+        // Инициализация приложения и платформы
+        async function initApp() {
+            // Инициализируем VK/OK Bridge
+            try {
+                vkBridge.send('VKWebAppInit');
+                
+                // Получаем данные текущего пользователя из соцсети
+                const user = await vkBridge.send('VKWebAppGetUserInfo');
+                if (user && user.id) {
+                    currentUserId = user.id;
+                    document.getElementById('user-name').innerText = user.first_name + ' ' + user.last_name;
+                    document.getElementById('user-id').innerText = user.id;
+                    if (user.photo_100) {
+                        document.getElementById('user-avatar').src = user.photo_100;
+                    }
+                }
+            } catch (e) {
+                console.log('Запуск вне контейнера соцсети, используется демо-режим');
+                document.getElementById('user-name').innerText = 'Тестовый Игрок';
+                document.getElementById('user-id').innerText = currentUserId;
+            }
+
+            // Загружаем пользователя в Supabase
+            await initUserInDb();
+
+            // Загружаем друзей пользователя
+            await loadFriends();
+        }
+
+        async function initUserInDb() {
+            let { data } = await supabaseClient
                 .from('ok_users')
                 .select('*')
                 .eq('id', currentUserId)
                 .maybeSingle();
 
             if (!data) {
-                // Если пользователя нет в базе — создаем тестовую запись
                 await supabaseClient.from('ok_users').insert([
                     { id: currentUserId, first_name: 'Игрок', last_name: 'ОК', coins: 100 }
                 ]);
@@ -89,33 +128,56 @@
             }
         }
 
+        async function loadFriends() {
+            const selectEl = document.getElementById('friends-select');
+            try {
+                // Запрашиваем друзей через VK/OK Bridge
+                const friendsData = await vkBridge.send('VKWebAppGetFriends');
+                if (friendsData && friendsData.users && friendsData.users.length > 0) {
+                    selectEl.innerHTML = '<option value="">-- Выберите друга из списка --</option>';
+                    friendsData.users.forEach(friend => {
+                        const opt = document.createElement('option');
+                        opt.value = friend.id;
+                        opt.innerText = `${friend.first_name} ${friend.last_name}`;
+                        selectEl.appendChild(opt);
+                    });
+                } else {
+                    selectEl.innerHTML = '<option value="">Друзья не найдены</option>';
+                }
+            } catch (e) {
+                // Если запуск не из приложения — ставим демо-друзей
+                selectEl.innerHTML = `
+                    <option value="">-- Демо-список (для теста) --</option>
+                    <option value="87654321">Иван Иванов</option>
+                    <option value="98765432">Елена Петрова</option>
+                `;
+            }
+        }
+
         async function sendGift() {
-            const receiverId = document.getElementById('receiver-id').value;
+            const receiverId = document.getElementById('friends-select').value;
             const giftType = document.getElementById('gift-type').value;
             const message = document.getElementById('gift-message').value;
             const statusEl = document.getElementById('status-message');
 
             if (!receiverId) {
-                statusEl.innerHTML = '<span class="text-red-500">Введите ID друга!</span>';
+                statusEl.innerHTML = '<span class="text-red-500">Выберите друга из списка!</span>';
                 return;
             }
 
-            // Отправляем подарок в базу данных Supabase
             const { error } = await supabaseClient.from('gifts').insert([
                 { sender_id: currentUserId, receiver_id: parseInt(receiverId), gift_type: giftType, message: message, is_secret: true }
             ]);
 
             if (error) {
-                statusEl.innerHTML = '<span class="text-red-500">Ошибка отправки: ' + error.message + '</span>';
+                statusEl.innerHTML = '<span class="text-red-500">Ошибка: ' + error.message + '</span>';
             } else {
-                statusEl.innerHTML = '<span class="text-green-600">Подарок успешно отправлен тайным агентом! 🎉</span>';
-                document.getElementById('receiver-id').value = '';
+                statusEl.innerHTML = '<span class="text-green-600">Подарок отправлен тайным агентом! 🎉</span>';
                 document.getElementById('gift-message').value = '';
             }
         }
 
         async function addBonusCoins() {
-            // Начисление бонуса
             const { data } = await supabaseClient.from('ok_users').select('coins').eq('id', currentUserId).maybeSingle();
             if(data) {
                 const newCoins = data.coins + 50;
@@ -124,8 +186,8 @@
             }
         }
 
-        // Автоматический запуск при загрузке страницы
-        initUser();
+        // Запуск
+        initApp();
     </script>
 </body>
 </html>
