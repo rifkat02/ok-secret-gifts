@@ -3,17 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Тайные Подарки - Одноклассники</title>
+    <title>Тайные Подарки</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- VK / OK Bridge SDK -->
     <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/index.umd.js"></script>
-    <!-- JS Confetti (Библиотека для праздничного салюта) -->
+    <!-- JS Confetti -->
     <script src="https://cdn.jsdelivr.net/npm/js-confetti@latest/dist/js-confetti.browser.js"></script>
     <style>
-        /* Анимация дрожания коробки перед открытием */
         @keyframes shake {
             0% { transform: translate(1px, 1px) rotate(0deg); }
             10% { transform: translate(-1px, -2px) rotate(-1deg); }
@@ -27,9 +26,7 @@
             90% { transform: translate(1px, 2px) rotate(0deg); }
             100% { transform: translate(1px, -2px) rotate(-1deg); }
         }
-        .animate-shake {
-            animation: shake 0.5s infinite;
-        }
+        .animate-shake { animation: shake 0.5s infinite; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-orange-100 to-pink-100 min-h-screen font-sans text-gray-800 p-4">
@@ -39,7 +36,7 @@
         <div class="flex items-center space-x-3 mb-4 p-2 bg-orange-50 rounded-xl border border-orange-100">
             <img id="user-avatar" src="https://via.placeholder.com/50" class="w-12 h-12 rounded-full border-2 border-orange-400">
             <div>
-                <h3 id="user-name" class="font-bold text-gray-800 text-sm">Загрузка профиля...</h3>
+                <h3 id="user-name" class="font-bold text-gray-800 text-sm">Игрок</h3>
                 <p class="text-xs text-gray-500">Ваш ID: <span id="user-id">---</span></p>
             </div>
         </div>
@@ -71,7 +68,7 @@
             <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Выберите друга:</label>
                 <select id="friends-select" class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm bg-white">
-                    <option value="">Загрузка списка друзей...</option>
+                    <option value="">Нажмите чтобы выбрать друга...</option>
                 </select>
             </div>
 
@@ -106,12 +103,10 @@
         <div id="status-message" class="mt-4 text-center text-sm font-medium"></div>
     </div>
 
-    <!-- Модальное окно красивой распаковки подарка -->
+    <!-- Модальное окно распаковки -->
     <div id="gift-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50">
         <div class="bg-white rounded-3xl p-6 text-center max-w-sm w-full shadow-2xl transform transition-all duration-300 scale-95" id="modal-box">
-            <div id="modal-gift-icon" class="text-7xl mb-4 transition-transform duration-500 cursor-pointer">
-                🎁
-            </div>
+            <div id="modal-gift-icon" class="text-7xl mb-4 transition-transform duration-500 cursor-pointer">📦</div>
             <h3 id="modal-title" class="text-xl font-bold text-gray-800">Тайный подарок!</h3>
             <p id="modal-subtitle" class="text-xs text-gray-500 mt-1">Нажмите на коробку, чтобы открыть</p>
             
@@ -137,54 +132,66 @@
         let currentUserId = 12345678; 
         let activeGiftToOpen = null;
 
+        // МГНОВЕННАЯ ИНИЦИАЛИЗАЦИЯ ДЛЯ VK / OK CONTAINER
+        if (window.vkBridge) {
+            vkBridge.send('VKWebAppInit');
+        }
+
         async function initApp() {
+            // Получаем пользователя из контейнера VK/OK
             try {
-                vkBridge.send('VKWebAppInit');
-                const user = await vkBridge.send('VKWebAppGetUserInfo');
-                if (user && user.id) {
-                    currentUserId = user.id;
-                    document.getElementById('user-name').innerText = user.first_name + ' ' + user.last_name;
-                    document.getElementById('user-id').innerText = user.id;
-                    if (user.photo_100) document.getElementById('user-avatar').src = user.photo_100;
+                if (window.vkBridge) {
+                    const user = await vkBridge.send('VKWebAppGetUserInfo');
+                    if (user && user.id) {
+                        currentUserId = user.id;
+                        document.getElementById('user-name').innerText = (user.first_name || 'Игрок') + ' ' + (user.last_name || '');
+                        document.getElementById('user-id').innerText = user.id;
+                        if (user.photo_100) document.getElementById('user-avatar').src = user.photo_100;
+                    }
                 }
             } catch (e) {
-                document.getElementById('user-name').innerText = 'Тестовый Игрок';
+                console.log('Запуск вне VK контейнера или ошибка:', e);
                 document.getElementById('user-id').innerText = currentUserId;
             }
 
-            await initUserInDb();
-            await loadFriends();
-            await loadReceivedGifts();
+            // Загружаем базы и друзей асинхронно
+            initUserInDb();
+            loadFriends();
+            loadReceivedGifts();
         }
 
         async function initUserInDb() {
-            let { data } = await supabaseClient.from('ok_users').select('*').eq('id', currentUserId).maybeSingle();
-            if (!data) {
-                await supabaseClient.from('ok_users').insert([{ id: currentUserId, first_name: 'Игрок', last_name: 'ОК', coins: 100 }]);
-            } else {
-                document.getElementById('user-coins').innerText = data.coins + ' 🪙 Оков';
-            }
+            try {
+                let { data } = await supabaseClient.from('ok_users').select('*').eq('id', currentUserId).maybeSingle();
+                if (!data) {
+                    await supabaseClient.from('ok_users').insert([{ id: currentUserId, first_name: 'Игрок', last_name: 'ОК', coins: 100 }]);
+                } else {
+                    document.getElementById('user-coins').innerText = data.coins + ' 🪙 Оков';
+                }
+            } catch(e) { console.error(e); }
         }
 
         async function loadFriends() {
             const selectEl = document.getElementById('friends-select');
             try {
-                const friendsData = await vkBridge.send('VKWebAppGetFriends');
-                if (friendsData && friendsData.users && friendsData.users.length > 0) {
-                    selectEl.innerHTML = '<option value="">-- Выберите друга --</option>';
-                    friendsData.users.forEach(f => {
-                        selectEl.innerHTML += `<option value="${f.id}">${f.first_name} ${f.last_name}</option>`;
-                    });
-                } else {
-                    selectEl.innerHTML = '<option value="">Нет друзей в приложении</option>';
+                if (window.vkBridge) {
+                    const friendsData = await vkBridge.send('VKWebAppGetFriends');
+                    if (friendsData && friendsData.users && friendsData.users.length > 0) {
+                        selectEl.innerHTML = '<option value="">-- Выберите друга --</option>';
+                        friendsData.users.forEach(f => {
+                            selectEl.innerHTML += `<option value="${f.id}">${f.first_name} ${f.last_name}</option>`;
+                        });
+                        return;
+                    }
                 }
-            } catch (e) {
-                selectEl.innerHTML = `
-                    <option value="">-- Демо-друзья --</option>
-                    <option value="87654321">Иван Иванов</option>
-                    <option value="98765432">Елена Петрова</option>
-                `;
-            }
+            } catch (e) { console.log('Не удалось загрузить реальных друзей'); }
+
+            // Фолбэк список
+            selectEl.innerHTML = `
+                <option value="">-- Выберите друга (Демо) --</option>
+                <option value="87654321">Иван Иванов</option>
+                <option value="98765432">Елена Петрова</option>
+            `;
         }
 
         async function sendGift() {
@@ -232,7 +239,7 @@
                             <p class="font-bold text-gray-800">${gift.gift_type}</p>
                             <p class="text-gray-500">${gift.is_opened ? '💬 ' + gift.message : '🔒 Тайное сообщение (скрыто)'}</p>
                         </div>
-                        <button onclick="startUnpackAnimation(${gift.id}, '${gift.gift_type}', '${gift.message.replace(/'/g, "\\'")}', ${gift.is_opened})" 
+                        <button onclick="startUnpackAnimation(${gift.id}, '${gift.gift_type}', '${(gift.message || '').replace(/'/g, "\\'")}', ${gift.is_opened})" 
                                 class="px-3 py-1.5 ${gift.is_opened ? 'bg-gray-300 text-gray-700' : 'bg-gradient-to-r from-orange-500 to-pink-500 text-white'} rounded-lg font-bold shadow">
                             ${gift.is_opened ? 'Просмотр' : 'Открыть 🎁'}
                         </button>
@@ -241,7 +248,6 @@
             });
         }
 
-        // Запуск анимации модального окна
         function startUnpackAnimation(id, type, message, isOpened) {
             activeGiftToOpen = { id, type, message, isOpened };
             
@@ -255,7 +261,6 @@
             modal.classList.remove('hidden');
 
             if (isOpened) {
-                // Если подарок уже открыт ранее
                 icon.innerText = '🎉';
                 icon.className = 'text-7xl mb-4';
                 title.innerText = type;
@@ -263,7 +268,6 @@
                 msgText.innerText = message;
                 msgBox.classList.remove('hidden');
             } else {
-                // Если подарок еще запечатан
                 icon.innerText = '📦';
                 icon.className = 'text-7xl mb-4 animate-shake cursor-pointer';
                 title.innerText = 'Вам пришел подарок!';
@@ -281,16 +285,14 @@
             const msgBox = document.getElementById('modal-message-box');
             const msgText = document.getElementById('modal-message-text');
 
-            icon.onclick = null; // Отключаем повторный клик
+            icon.onclick = null;
             icon.className = 'text-7xl mb-4 transition-transform duration-500 scale-125';
 
-            // Эффект взрыва конфетти
             jsConfetti.addConfetti({
                 emojis: ['🎉', '💖', '🎁', '⭐', '🎈'],
                 confettiNumber: 80,
             });
 
-            // Менявм иконку на открытый подарок
             setTimeout(async () => {
                 icon.innerText = '🎉';
                 title.innerText = activeGiftToOpen.type;
@@ -298,7 +300,6 @@
                 msgText.innerText = activeGiftToOpen.message;
                 msgBox.classList.remove('hidden');
 
-                // Обновляем статус в базе Supabase
                 await supabaseClient.from('gifts').update({ is_opened: true }).eq('id', activeGiftToOpen.id);
                 loadReceivedGifts();
             }, 400);
@@ -329,14 +330,17 @@
         }
 
         async function addBonusCoins() {
-            const { data } = await supabaseClient.from('ok_users').select('coins').eq('id', currentUserId).maybeSingle();
-            if(data) {
-                const newCoins = data.coins + 50;
-                await supabaseClient.from('ok_users').update({ coins: newCoins }).eq('id', currentUserId);
-                document.getElementById('user-coins').innerText = newCoins + ' 🪙 Оков';
-            }
+            try {
+                const { data } = await supabaseClient.from('ok_users').select('coins').eq('id', currentUserId).maybeSingle();
+                if(data) {
+                    const newCoins = data.coins + 50;
+                    await supabaseClient.from('ok_users').update({ coins: newCoins }).eq('id', currentUserId);
+                    document.getElementById('user-coins').innerText = newCoins + ' 🪙 Оков';
+                }
+            } catch(e) { console.error(e); }
         }
 
+        // Запуск
         initApp();
     </script>
 </body>
